@@ -2,7 +2,7 @@
 
 An open-source AI chatbot designed to enhance social interactions in VRChat. Powered by natural language processing (NLP) and customizable personalities!
 
-![VRChat AI Chatbot Demo](https://via.placeholder.com/800x400.png?text=Demo+Preview+Placeholder) *Replace with actual screenshot/video*
+![VRChat AI Chatbot Demo](https://via.placeholder.com/800x400.png?text=Demo+Preview+Placeholder) *Will replace with video when ready*
 
 ## Features ✨
 - **Auto-Response System**: Reacts to in-game text/voice chat in real-time
