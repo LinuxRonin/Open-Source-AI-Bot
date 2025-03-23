@@ -42,3 +42,18 @@ Follow these steps to get the VRChat AI Suite up and running:
 
 ## Configuration
 - The bot requires configuration through two files: **.env** and **config.json.**
+- Edit the file config.yaml:
+  ```yaml
+  vrchat:
+  api_key: "YOUR_VRCHAT_API_KEY"
+  username: "YourBotAccountEmail"
+  password: "YourBotAccountPassword"
+
+   ai:
+  engine: "openai"  # openai/dialogflow/rasa
+  api_key: "YOUR_NLP_API_KEY"
+  personality: "friendly"  # friendly/sarcastic/shy
+
+  tts:
+  enabled: true
+  provider: "gtts"  # gtts/pyttsx3/other
