@@ -1,16 +1,24 @@
-# OpenSource_AI_Bot
-Open Source AI Chat bot for use in VRCHAT. Similar to "Celeste-AI"
+# VRChat AI Chatbot 🤖🎮
 
-# VRChat AI Suite
+An open-source AI chatbot designed to enhance social interactions in VRChat. Powered by natural language processing (NLP) and customizable personalities!
 
-A monorepo for a VRChat bot that provides real-time chat interactions, avatar control, and content moderation using OpenAI and VRChat APIs.
+![VRChat AI Chatbot Demo](https://via.placeholder.com/800x400.png?text=Demo+Preview+Placeholder) *Replace with actual screenshot/video*
 
-## Features
+## Features ✨
+- **Auto-Response System**: Reacts to in-game text/voice chat in real-time
+- **NLP Integration**: Compatible with OpenAI GPT, Dialogflow, or Rasa
+- **Customizable Personality**: Set moods (friendly, sarcastic, shy) via config
+- **VR-Compatible Workflow**: Optimized for VRChat's API and performance
+- **Voice Synthesis**: Optional text-to-speech (TTS) support
+- **Open Source**: MIT Licensed - modify and share freely!
 
-- **Real-time Chat**: Engages with users in VRChat via WebSocket, generating responses using OpenAI's GPT-3.
-- **Avatar Control**: Triggers animations on the bot's avatar using VRChat's REST API.
-- **Content Moderation**: Filters inappropriate messages based on a configurable list of blocked words.
-- **Monorepo Structure**: Unified development, shared configuration, and modular design for easier maintenance and deployment.
+## Prerequisites 📋
+- Python 3.8+
+- [VRChat API Key](https://vrchat.com/home/developer)
+- NLP Service API Key (OpenAI/Dialogflow/Rasa)
+- (Optional) Voice Synthesis Tool (e.g., [gTTS](https://gtts.readthedocs.io/))
+- VRChat Account with Moderation Permissions
+
 
 
 ## Setup
