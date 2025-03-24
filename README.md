@@ -70,7 +70,7 @@ The VRChat AI Companion system works as an integrated world asset rather than a 
   
 ## Prerequisites 📋
 
-- Unity 2019.4.31f1 (VRChat SDK compatible version)
+- [Unity](https://unity.com/) 2019.4.31f1 (VRChat SDK compatible version)
 - [VRChat Creator Companion](https://vcc.docs.vrchat.com/)
 - [UdonSharp](https://github.com/vrchat-community/UdonSharp)
 - Basic understanding of Unity and VRChat world creation
