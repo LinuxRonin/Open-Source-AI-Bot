@@ -180,6 +180,8 @@ Created by [LinuxRonin](https://github.com/LinuxRonin)
 
 Co-Authored by [Rey](https://github.com/ReyingRexer)
 
+Managed by [Ike](https://github.com/xMrIKEx)
+
 **Made with ❤️ for the VRChat community**
 
 </div>
