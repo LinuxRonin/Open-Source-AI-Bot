@@ -173,7 +173,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-Created by [LinuxRonin](https://github.com/LinuxRonin) | Last Updated: 2025-03-25
+Created by [LinuxRonin](https://github.com/LinuxRonin) | Last Updated: 2025-03-30
+Co-Authored by [Rey](https://github.com/ReyingRexer)
 
 **Made with ❤️ for the VRChat community**
 
