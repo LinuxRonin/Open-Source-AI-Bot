@@ -5,7 +5,7 @@
 ![Unity Version](https://img.shields.io/badge/Unity-2022.3%2B-blue.svg)
 ![VRChat SDK](https://img.shields.io/badge/VRChat%20SDK-3.0-5865f2.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
-![Last Updated](https://img.shields.io/badge/Updated-2025--03--25-orange.svg)
+![Last Updated](https://img.shields.io/badge/Updated-2025--04--01-orange.svg)
 
 **Create interactive NPCs for your VRChat worlds - no external services required!**
 
