@@ -5,165 +5,235 @@
 ![Unity Version](https://img.shields.io/badge/Unity-2022.3%2B-blue.svg)
 ![VRChat SDK](https://img.shields.io/badge/VRChat%20SDK-3.0-5865f2.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
-![Last Updated](https://img.shields.io/badge/Updated-2025--04--01-orange.svg)
+![Last Updated](https://img.shields.io/badge/Updated-2025--04--07-orange.svg)
 
-**Create interactive NPCs for your VRChat worlds - no external services required!**
+**Create interactive NPCs for your VRChat worlds with AI integration!**
 
 [Features](#-features) •
 [Requirements](#-requirements) •
 [Installation](#-installation) •
 [How It Works](#-how-it-works) •
-[Customization](#-customization) •
+[Configuration](#-configuration) •
 [Performance](#-performance) •
-[Guidelines](#-vrchat-guidelines)
+[Guidelines](#-vrchat-guidelines) •
+[Contributing](#-contributing)
 
 </div>
 
 ## ✨ Features
 
-- **🔒 No External Authentication** - Uses VRChat's native permission system
+- **🔒 Local Backend Service** - Python-based backend with no external dependencies
+- **⚡ OSC Communication** - Seamless integration with VRChat's OSC protocol
 - **👋 Proximity Detection** - Chat UI appears when players approach
-- **💬 Keyword Response System** - Simple NLP using customizable keyword matching
+- **💬 AI Response System** - Knowledge-based responses to player interactions
 - **🎭 Avatar Interaction** - Responds to player gestures and movements
+- **📢 Discord Notifications** - Get alerted when players interact with items
 - **🌐 Multiplayer Ready** - Optimized for busy VRChat worlds
-- **📝 Well-Documented** - Extensively commented code for easy customization
+- **📝 Fully Documented** - Extensively commented code for easy customization
 - **🚀 Performance Optimized** - Minimal impact on frame rates
 - **📱 Desktop & VR Compatible** - Works seamlessly across platforms
 
 ## 📋 Requirements
 
-- Unity 2022.3 or newer
-- VRChat SDK3
-- UdonSharp
-- Basic understanding of Unity and Udon
+- **Unity:** 2022.3 or newer
+- **VRChat SDK:** SDK3 Worlds
+- **UdonSharp:** Latest version
+- **Python:** 3.8+ (for backend service)
+- **Dependencies:** Flask, python-osc, requests (included in requirements.txt)
+- **Basic knowledge:** Unity, Udon, Python (for customization)
 
 ## 📥 Installation
+
+### VRChat World Setup (Unity)
 
 1. **Download** the package from [Releases](https://github.com/LinuxRonin/Open-Source-AI-Bot/releases)
 2. **Import** into your Unity VRChat world project
 3. **Drag** the `AIAssistant` prefab into your scene
-4. **Adjust** the proximity trigger to your liking
-5. **Customize** the response database (see Customization section)
-6. **Test** in Play mode before uploading to VRChat
+4. **Configure** the scripts:
+   - Assign the `OSCManager` component to all `InteractableItem` instances
+   - Set up the `ChatUIManager` with appropriate UI elements
+5. **Build & Test** in Unity Play mode before uploading
+
+### Backend Service Setup (Python)
+
+1. **Clone** this repository to your local machine
+2. **Install** dependencies: `pip install -r requirements.txt`
+3. **Copy** `Config Example.json` to `config.json` and customize:
+   ```json
+   {
+     "osc_server_ip": "0.0.0.0",
+     "osc_server_port": 9001,
+     "vrchat_client_ip": "127.0.0.1",
+     "vrchat_client_port": 9000,
+     "discord_webhook_url": "YOUR_DISCORD_WEBHOOK_URL_HERE",
+     "knowledge_base_file": "knowledge_base.json",
+     "owner_discord_ids": ["<@YOUR_DISCORD_USER_ID>"]
+   }
+   ```
+4. **Create** a `knowledge_base.json` file for AI responses (example below)
+5. **Run** the backend service: `python "Python Backend Service.py"`
 
 ## 🔍 How It Works
 
-### Architecture Overview
+### System Architecture
 
-The system consists of three core components working together:
+The system consists of three core components:
 
+1. **Unity/VRChat Components:**
+   - `InteractableItem.cs`: Handles player interactions with objects
+   - `OSCManager.cs`: Facilitates communication with the backend
+   - `ChatUIManager.cs`: Manages the UI for player input and bot responses
 
-</div>
+2. **Python Backend Service:**
+   - Listens for OSC messages from VRChat
+   - Processes player inputs using a knowledge base
+   - Sends responses back to VRChat via OSC
+   - Dispatches Discord notifications for important events
 
-### Proximity Detection
+3. **Configuration Files:**
+   - `config.json`: Backend service settings
+   - `knowledge_base.json`: Custom responses database
+   - `requirements.txt`: Python dependencies
 
-Uses VRChat's EventTrigger system to detect when players are within a customizable range. When a player enters this zone, the chat UI automatically appears.
+### Communication Flow
 
-### Chat UI System
+```
+Player in VRChat → InteractableItem → OSCManager → Python Backend → AI Processing → OSC → VRChat Avatar Parameters → Chat Display
+```
 
-A clean, intuitive interface powered by Unity's Canvas system that:
-- Displays NPC responses with typewriter effect
-- Provides input field for player messages
-- Shows conversation history
-- Automatically scales for desktop and VR
+### Knowledge Base Structure
 
-### Response System
+The system uses a simple but effective JSON-based knowledge base:
 
-The heart of the AI chatbot using a keyword-matching NLP system:
-- Analyzes player input for keywords
-- Matches against a customizable database
-- Applies priority weighting to select best response
-- Supports random variation for natural conversation flow
+```json
+{
+  "coffee": {
+    "aliases": ["java", "brew", "espresso"],
+    "description": "We serve fresh coffee from local roasters!",
+    "details": "Prices range from $3-$5.",
+    "website": "coffee.example.com",
+    "contact": "barista@example.com"
+  },
+  "art gallery": {
+    "aliases": ["paintings", "artwork", "exhibit"],
+    "description": "Our gallery features rotating exhibits from local artists.",
+    "details": "Open weekends 10am-8pm.",
+    "website": "gallery.example.com",
+    "contact": "curator@example.com"
+  }
+}
+```
 
-### Avatar Interaction
+## ⚙️ Configuration
 
-The system can detect and respond to VRChat-specific player actions:
-- Wave detection triggers greeting responses
-- Jump detection for playful interactions
-- Configurable gesture recognition
+### Backend Configuration
 
-## 🎨 Customization
+The `config.json` file controls the backend service:
 
-### Response Database Editor
-
-The system comes with an intuitive editor for customizing responses:
-
-<div align="center">
-
-
-</div>
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `osc_server_ip` | IP to listen on for OSC messages | `0.0.0.0` |
+| `osc_server_port` | Port to listen on | `9001` |
+| `vrchat_client_ip` | VRChat client IP | `127.0.0.1` |
+| `vrchat_client_port` | VRChat client port | `9000` |
+| `discord_webhook_url` | Discord notification URL | `""` |
+| `knowledge_base_file` | Path to responses database | `knowledge_base.json` |
+| `owner_discord_ids` | Discord IDs to ping | `[]` |
 
 ### UI Customization
 
 All UI elements are easily customizable through the Unity Inspector:
-- Colors, fonts, and background images
 - Chat bubble size and positioning
-- Animation timing and effects
-- Sound effects (typing, message received)
+- Font styles and colors
+- Input field appearance
+- Background transparency
 
-### Personality Templates
+### Interactable Items
 
-Choose from pre-built personalities or create your own:
-- **Friendly Guide** - Helpful, informative, perfect for tutorials
-- **Mysterious Character** - Cryptic, intriguing, great for story-driven worlds
-- **Comic Relief** - Funny, sarcastic, adds humor to any setting
+For each interactive item in your world:
+1. Add the `InteractableItem` component
+2. Set a unique `itemId` and descriptive `itemDisplayName`
+3. Reference your scene's `OSCManager` instance
 
 ## 🚀 Performance
 
 The system is designed with VRChat's performance requirements in mind:
 
-- **Efficient Trigger System** - Uses optimized colliders for detection
-- **Event-Based Architecture** - Minimal Update() usage reduces CPU load
-- **Batched UI Elements** - Reduced draw calls for better rendering performance
-- **Memory-Efficient Responses** - Text-based system with minimal overhead
+- **Optimized OSC Communication**: Lightweight messaging system
+- **Efficient Python Backend**: Low resource utilization
+- **Event-Based Architecture**: Minimal Update() usage
+- **Background Threading**: Server operations don't block
 
 ### Performance Metrics
 
-| Player Count | FPS Impact | Memory Usage |
-|--------------|------------|--------------|
-| 1-10 players | < 0.5 ms   | ~5 MB        |
-| 11-25 players| < 1.0 ms   | ~5 MB        |
-| 26+ players  | < 1.5 ms   | ~5 MB        |
+| Component | Resource Usage | Notes |
+|-----------|---------------|-------|
+| Unity Scripts | ~0.5ms CPU | Per interactive object |
+| Python Backend | ~15MB RAM | Single instance for all players |
+| OSC Network | ~1KB/message | Minimal bandwidth required |
 
 ## 📊 VRChat Guidelines
 
 This system is designed to comply with VRChat's world submission guidelines:
 
-- ✅ **No External Services** - 100% self-contained within VRChat
-- ✅ **No Sensitive Data Collection** - All processing happens locally
+- ✅ **Limited External Services** - Only optional Discord notifications
+- ✅ **No Sensitive Data Collection** - Only processes public username/ID
 - ✅ **Performance Optimized** - Minimal impact on frame rates
-- ✅ **Cross-Platform Compatible** - Works on PC, VR, and Quest
-- ✅ **Appropriate Content Control** - Response database can be moderated
+- ✅ **Cross-Platform Compatible** - Works on PC and Quest
+- ✅ **Appropriate Content Control** - Customizable knowledge base
 
 ## 🔧 Troubleshooting
 
 <details>
 <summary><b>Common Issues & Solutions</b></summary>
 
-### Chat UI doesn't appear when approaching NPC
-- Check that the EventTrigger collider is properly sized
-- Verify the Canvas is set to "World Space"
-- Make sure the proximity script is active
+### VRChat Client Issues
 
-### Bot doesn't respond to input
-- Check that keywords in your response database match what users might type
-- Verify input field is properly connected to the response system
-- Make sure priority values are appropriate
+- **OSC Communication Failing**
+  - Ensure OSC is enabled in VRChat settings (Options → OSC → Enabled)
+  - Verify ports are not blocked by firewall
+  - Check Unity script references
 
-### Performance issues in large worlds
-- Reduce UI complexity (fewer visual effects)
-- Decrease check frequency in proximity detection
-- Optimize response database size
+### Backend Service Issues
+
+- **Service Won't Start**
+  - Check if another application is using port 9001
+  - Verify Python 3.8+ is installed
+  - Ensure all dependencies are installed via requirements.txt
+
+### Discord Notification Issues
+
+- **Notifications Not Arriving**
+  - Verify webhook URL is correct
+  - Check Discord server permissions
+  - Ensure internet connectivity
 
 </details>
 
-## 📘 Documentation
+## 📘 Advanced Usage
 
-For complete documentation, visit the [Wiki](https://github.com/LinuxRonin/Open-Source-AI-Bot/wiki)
+### Extending the Knowledge Base
+
+The knowledge base system supports:
+- Multiple aliases for the same concept
+- Rich details with websites and contact info
+- Hierarchical categorization (by nesting objects)
+
+### Custom Backend Integration
+
+Advanced users can modify the Python backend to:
+- Connect to external AI services like OpenAI
+- Add database storage for conversation history
+- Implement more sophisticated NLP techniques
 
 ## 🤝 Contributing
 
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+Before submitting a pull request:
+1. Ensure code follows project style guidelines
+2. Test thoroughly in both desktop and VR modes
+3. Document any new features or changes
 
 ## 📄 License
 
@@ -173,8 +243,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-
-Last Updated: 2025-03-30
+Last Updated: 2025-04-07
 
 Created by [LinuxRonin](https://github.com/LinuxRonin)
 
