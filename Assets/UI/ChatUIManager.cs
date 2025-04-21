@@ -4,7 +4,7 @@ using UnityEngine.UI;
 using VRC.SDKBase;
 using VRC.Udon;
 using AI.Engine; // Assuming AIEngine is in this namespace
-using System.Collections.Generic; // Corrected namespace
+using System.Collections.Generic;
 using System.Text;
 using System;
 using UnityEngine.EventSystems; // Added for BaseEventData
@@ -15,46 +15,86 @@ public class ChatUIManager : UdonSharpBehaviour
     [Header("UI References")]
     public InputField playerInputField;
     public Text chatDisplayArea;
-    public GameObject chatPanel;
+    public GameObject chatPanel; // Panel containing chat UI elements
     public ScrollRect chatScrollRect;
 
     [Header("System References")]
+    [Tooltip("Reference to the AIEngine UdonBehaviour.")]
     public AIEngine aiEngine;
-    public TTSManager ttsManager; // Assuming TTSManager is in AI.Engine or global
+    [Tooltip("Reference to the TTSManager UdonBehaviour (Optional, Windows Editor TTS only).")]
+    public TTSManager ttsManager; // TTS will likely NOT work in VRChat builds
 
     [Header("Proximity Settings")]
     public bool useProximity = true;
     public float proximityDistance = 3.0f;
+    [Tooltip("The GameObject whose position is used as the center for proximity checks.")]
     public Transform proximityOrigin;
 
     [Header("Chat Settings")]
     public int maxChatHistory = 20;
     public string playerMessagePrefix = "[You]: ";
-    public string botMessagePrefix; // Set via AIConfig
-    public string botMessageSuffix;
+    // Bot prefix/suffix will be fetched from AIConfig via AIEngine
+    private string botMessagePrefix = "[Bot]: "; // Default fallback
+    private string botMessageSuffix = "";
 
     private List<string> chatHistory = new List<string>();
     private VRCPlayerApi localPlayer;
     private StringBuilder stringBuilder = new StringBuilder();
     private bool isInputFocused = false;
+    private bool isInitialized = false;
 
-    private void Start()
+    void Start()
     {
         Initialize();
     }
 
     private void Initialize()
     {
-        localPlayer = Networking.LocalPlayer;
+        localPlayer = Networking.LocalPlayer; // Can be null initially
 
-        if (playerInputField == null || chatDisplayArea == null || aiEngine == null)
+        // --- Essential Reference Checks ---
+        if (playerInputField == null) {
+            LogError("Player Input Field is not assigned!");
+            this.enabled = false; // Disable if core UI is missing
+            return;
+        }
+        if (chatDisplayArea == null) {
+             LogError("Chat Display Area is not assigned!");
+             this.enabled = false;
+             return;
+        }
+         if (chatPanel == null) {
+             LogWarning("Chat Panel is not assigned! UI will always be visible if active.");
+             useProximity = false; // Disable proximity if panel is missing
+         }
+        if (aiEngine == null)
         {
-            LogError("ChatUIManager is missing references!");
-            if (playerInputField != null) playerInputField.interactable = false;
+            LogError("AIEngine reference is not assigned! Chatbot cannot function.");
+            // Display error message to user?
+            DisplayBotMessage("Error: AI Engine not connected.");
+            this.enabled = false; // Disable component if AI is missing
             return;
         }
 
-        // Ensure AIConfig exists before accessing it
+        // --- Optional Reference Checks ---
+        if (ttsManager == null) {
+             LogWarning("TTSManager is not assigned. Text-to-Speech will be unavailable.");
+        } else {
+             #if !UNITY_EDITOR_WIN
+             LogWarning("TTSManager is assigned, but TTS functionality is generally NOT available in VRChat builds or on non-Windows platforms.");
+             #endif
+        }
+         if (useProximity && proximityOrigin == null) {
+             LogWarning("useProximity is enabled, but Proximity Origin is not assigned! Disabling proximity.");
+             useProximity = false;
+         }
+         if (chatScrollRect == null) {
+             LogWarning("Chat Scroll Rect is not assigned. Auto-scrolling will be disabled.");
+         }
+
+
+        // --- Setup ---
+        // Fetch bot name style from AIConfig via AIEngine (check if aiConfig exists first)
         if (aiEngine.aiConfig != null)
         {
             botMessagePrefix = aiEngine.aiConfig.botNamePrefix;
@@ -62,64 +102,75 @@ public class ChatUIManager : UdonSharpBehaviour
         }
         else
         {
-            botMessagePrefix = "[Bot]: "; // Default if AIConfig is missing
-            botMessageSuffix = "";
-            LogWarning("AIConfig is not assigned in AIEngine. Using default bot prefix.");
+            LogWarning("AIConfig is not assigned in the referenced AIEngine. Using default bot prefix/suffix.");
+            // Keep the default fallback values assigned above
         }
 
         playerInputField.text = "";
+        // Ensure listeners are cleared before adding (prevents duplicates on re-compile/re-enable)
+        playerInputField.onEndEdit.RemoveListener(OnInputFieldSubmit);
+        playerInputField.onSelect.RemoveListener(OnInputFieldSelect);
+        playerInputField.onDeselect.RemoveListener(OnInputFieldDeselect);
+        // Add listeners
         playerInputField.onEndEdit.AddListener(OnInputFieldSubmit);
+        playerInputField.onSelect.AddListener(OnInputFieldSelect);
+        playerInputField.onDeselect.AddListener(OnInputFieldDeselect);
 
-        // FIX: Corrected listener signatures for onSelect and onDeselect
-        // They expect a BaseEventData argument.
-        playerInputField.onSelect.AddListener((BaseEventData data) => { isInputFocused = true; });
-        playerInputField.onDeselect.AddListener((BaseEventData data) => { isInputFocused = false; });
 
-        if (useProximity && chatPanel != null)
-        {
-            chatPanel.SetActive(false);
-        }
-        else if (useProximity && chatPanel == null) {
-            LogWarning("useProximity is true, but chatPanel is not assigned.");
+        if (chatPanel != null) {
+             chatPanel.SetActive(!useProximity); // Start inactive if using proximity
         }
 
-        // Optionally display an initial message
-        // DisplayBotMessage("Hello! Ask me anything.");
+        // DisplayBotMessage("Hello! Ask me anything."); // Optional initial message
+        isInitialized = true;
+         Log("ChatUIManager Initialized successfully.");
     }
 
-    private void Update()
+    void Update()
     {
+        if (!isInitialized) return; // Don't run update if initialization failed
+
+        // Ensure localPlayer is valid (it might be null briefly on startup)
+        if (localPlayer == null) {
+             localPlayer = Networking.LocalPlayer;
+             if(localPlayer == null) return; // Still null, wait for next frame
+        }
+
         HandleProximity();
         HandleInputActivation();
     }
 
     private void HandleProximity()
     {
-        if (!useProximity || chatPanel == null || proximityOrigin == null) return;
-        // Check if localPlayer is valid (it might be null briefly on startup or if not in VR/Editor)
-        if (localPlayer == null) {
-             localPlayer = Networking.LocalPlayer;
-             if(localPlayer == null) return; // Still null, exit
-        }
+        if (!useProximity || chatPanel == null || proximityOrigin == null || localPlayer == null) return;
 
-
-        float distance = Vector3.Distance(localPlayer.GetPosition(), proximityOrigin.position);
-        bool shouldBeActive = distance <= proximityDistance;
+        // Use squared distance for slight performance improvement (avoids sqrt)
+        float sqrDistance = Vector3.SqrMagnitude(localPlayer.GetPosition() - proximityOrigin.position);
+        float sqrProximityDistance = proximityDistance * proximityDistance;
+        bool shouldBeActive = sqrDistance <= sqrProximityDistance;
 
         if (chatPanel.activeSelf != shouldBeActive)
         {
             chatPanel.SetActive(shouldBeActive);
             if (shouldBeActive)
             {
-                RefreshChatDisplay(); // Refresh when panel becomes active
+                RefreshChatDisplay(); // Refresh chat content when panel appears
+                ScrollToBottom(); // Ensure latest message is visible
+            } else {
+                 // Optional: Deactivate input field if player leaves proximity?
+                 // if (isInputFocused) playerInputField.DeactivateInputField();
             }
         }
     }
 
+    // Allows activating the chat input field by pressing Enter when not focused
     private void HandleInputActivation()
     {
-        // Check if input field exists and is interactable
         if (playerInputField == null || !playerInputField.interactable) return;
+
+        // Check if the chat panel is active (or if proximity isn't used)
+        bool canInteract = (chatPanel != null && chatPanel.activeSelf) || !useProximity;
+        if (!canInteract) return;
 
         // Use GetKeyDown for single activation press
         if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
@@ -127,34 +178,46 @@ public class ChatUIManager : UdonSharpBehaviour
              if (!isInputFocused)
              {
                 playerInputField.ActivateInputField(); // Focus the input field
+                // Select all text? playerInputField.Select();
              }
-             // Note: onEndEdit handles the submission when Enter is pressed while focused
+             // Submission is handled by OnInputFieldSubmit when Enter is pressed while focused
         }
     }
+
+    // Listener for InputField onSelect event
+    public void OnInputFieldSelect(BaseEventData data) {
+         isInputFocused = true;
+         // Optional: Disable player movement while typing? (Requires PlayerMod permissions or specific setup)
+    }
+
+    // Listener for InputField onDeselect event
+    public void OnInputFieldDeselect(BaseEventData data) {
+         isInputFocused = false;
+         // Optional: Re-enable player movement
+    }
+
 
     // Called when Enter is pressed while Input Field is focused, or when deselected
     public void OnInputFieldSubmit(string message)
     {
-        // Only submit if Enter was pressed (check GetKeyDown again)
+        // Only submit if Enter was pressed (check GetKeyDown again as onEndEdit triggers on deselect too)
         if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
         {
             if (!string.IsNullOrWhiteSpace(message))
             {
                 SendMessageToAI(message);
-                playerInputField.text = "";
-                // Reactivate the input field to allow continuous typing after sending
+                playerInputField.text = ""; // Clear input field AFTER sending
+                // Reactivate to allow continuous typing without clicking again
                 playerInputField.ActivateInputField();
             } else {
-                 // If message is empty/whitespace, just keep focus
+                 // If message is empty/whitespace, just clear and keep focus
+                 playerInputField.text = "";
                  playerInputField.ActivateInputField();
             }
         }
-         // Important: Keep the input field focused even after submitting
-         // If you lose focus here, you might need to press Enter twice.
-         // playerInputField.ActivateInputField(); // Ensure it stays focused for next message
     }
 
-    // Optional: Separate button click handler if you have a Send button
+    // Optional: Handler for a dedicated Send Button
     public void OnSendButtonPressed()
     {
         if (playerInputField == null) return;
@@ -167,28 +230,29 @@ public class ChatUIManager : UdonSharpBehaviour
         }
     }
 
-    // FIX: Made public so InteractableItem can call it
+    // Public method accessible by other scripts (like InteractableItem)
     public void SendMessageToAI(string message)
     {
-        if (aiEngine == null)
+        if (!isInitialized || aiEngine == null) // Double check initialization and reference
         {
-            LogError("AIEngine is not assigned!");
-            DisplayBotMessage("Error: AI Engine not connected."); // Inform user
+            LogError("Cannot send message, AIEngine not available or not initialized.");
             return;
         }
 
         // Display player message immediately for responsiveness
         DisplayPlayerMessage(message);
 
-        // Get response from AI
-        string response = aiEngine.ProcessInput(message);
+        // Get response from AI Engine
+        string response = aiEngine.ProcessInput(message); // ProcessInput should handle its own errors/defaults
         DisplayBotMessage(response);
 
-        // Trigger TTS if available
+        // Trigger TTS only if manager exists AND we are in the Windows Editor
+        #if UNITY_EDITOR_WIN
         if (ttsManager != null)
         {
             ttsManager.Speak(response);
         }
+        #endif
     }
 
     private void DisplayPlayerMessage(string message)
@@ -196,7 +260,7 @@ public class ChatUIManager : UdonSharpBehaviour
         AddChatMessage($"{playerMessagePrefix}{message}");
     }
 
-    // Made public in case other scripts need to display bot messages directly
+    // Public in case other scripts need to display bot messages directly
     public void DisplayBotMessage(string message)
     {
         AddChatMessage($"{botMessagePrefix}{message}{botMessageSuffix}");
@@ -223,7 +287,7 @@ public class ChatUIManager : UdonSharpBehaviour
         }
         chatDisplayArea.text = stringBuilder.ToString();
 
-        // Scroll to bottom
+        // Scroll to bottom after layout rebuilds (using delayed event)
         ScrollToBottom();
     }
 
@@ -231,10 +295,8 @@ public class ChatUIManager : UdonSharpBehaviour
     {
          if (chatScrollRect != null)
         {
-            // Using Canvas.ForceUpdateCanvases() before scrolling can sometimes help
-            // Canvas.ForceUpdateCanvases();
-            // chatScrollRect.verticalNormalizedPosition = 0f;
-            // Using DelayedFrames is often more reliable for scroll rects
+            // Using SendCustomEventDelayedFrames is generally the most reliable way
+            // to scroll after the UI layout has updated in the same frame.
             SendCustomEventDelayedFrames(nameof(UpdateScrollRect), 1);
         }
     }
@@ -243,18 +305,20 @@ public class ChatUIManager : UdonSharpBehaviour
     public void UpdateScrollRect()
     {
         if (chatScrollRect != null) {
-            chatScrollRect.verticalNormalizedPosition = 0f;
+            // Ensure it scrolls all the way down
+            chatScrollRect.normalizedPosition = new Vector2(0, 0);
+            // Or chatScrollRect.verticalNormalizedPosition = 0f;
         }
     }
 
-
-    private void LogError(string message)
-    {
+    // Centralized logging
+     private void Log(string message) {
+         Debug.Log($"[ChatUIManager] {message}");
+     }
+    private void LogError(string message) {
         Debug.LogError($"[ChatUIManager] {message}");
     }
-
-    private void LogWarning(string message)
-    {
+    private void LogWarning(string message) {
         Debug.LogWarning($"[ChatUIManager] {message}");
     }
 }
