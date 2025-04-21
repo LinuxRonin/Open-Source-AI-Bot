@@ -3,10 +3,11 @@ using UnityEngine;
 using UnityEngine.UI;
 using VRC.SDKBase;
 using VRC.Udon;
-using AI.Engine;
-using System.Collections.Generic;
+using AI.Engine; // Assuming AIEngine is in this namespace
+using System.Collections.Generic; // Corrected namespace
 using System.Text;
 using System;
+using UnityEngine.EventSystems; // Added for BaseEventData
 
 [UdonBehaviourSyncMode(BehaviourSyncMode.NoVariableSync)] // Local only
 public class ChatUIManager : UdonSharpBehaviour
@@ -19,7 +20,7 @@ public class ChatUIManager : UdonSharpBehaviour
 
     [Header("System References")]
     public AIEngine aiEngine;
-    public TTSManager ttsManager;
+    public TTSManager ttsManager; // Assuming TTSManager is in AI.Engine or global
 
     [Header("Proximity Settings")]
     public bool useProximity = true;
@@ -53,6 +54,7 @@ public class ChatUIManager : UdonSharpBehaviour
             return;
         }
 
+        // Ensure AIConfig exists before accessing it
         if (aiEngine.aiConfig != null)
         {
             botMessagePrefix = aiEngine.aiConfig.botNamePrefix;
@@ -62,20 +64,27 @@ public class ChatUIManager : UdonSharpBehaviour
         {
             botMessagePrefix = "[Bot]: "; // Default if AIConfig is missing
             botMessageSuffix = "";
-            LogWarning("AIConfig is not assigned. Using default bot prefix.");
+            LogWarning("AIConfig is not assigned in AIEngine. Using default bot prefix.");
         }
 
         playerInputField.text = "";
         playerInputField.onEndEdit.AddListener(OnInputFieldSubmit);
-        playerInputField.onSelect.AddListener((string text) => { isInputFocused = true; });
-        playerInputField.onDeselect.AddListener((string text) => { isInputFocused = false; });
+
+        // FIX: Corrected listener signatures for onSelect and onDeselect
+        // They expect a BaseEventData argument.
+        playerInputField.onSelect.AddListener((BaseEventData data) => { isInputFocused = true; });
+        playerInputField.onDeselect.AddListener((BaseEventData data) => { isInputFocused = false; });
 
         if (useProximity && chatPanel != null)
         {
             chatPanel.SetActive(false);
         }
+        else if (useProximity && chatPanel == null) {
+            LogWarning("useProximity is true, but chatPanel is not assigned.");
+        }
 
-        DisplayBotMessage("Hello! Ask me anything.");
+        // Optionally display an initial message
+        // DisplayBotMessage("Hello! Ask me anything.");
     }
 
     private void Update()
@@ -86,7 +95,13 @@ public class ChatUIManager : UdonSharpBehaviour
 
     private void HandleProximity()
     {
-        if (!useProximity || chatPanel == null || proximityOrigin == null || localPlayer == null) return;
+        if (!useProximity || chatPanel == null || proximityOrigin == null) return;
+        // Check if localPlayer is valid (it might be null briefly on startup or if not in VR/Editor)
+        if (localPlayer == null) {
+             localPlayer = Networking.LocalPlayer;
+             if(localPlayer == null) return; // Still null, exit
+        }
+
 
         float distance = Vector3.Distance(localPlayer.GetPosition(), proximityOrigin.position);
         bool shouldBeActive = distance <= proximityDistance;
@@ -96,51 +111,80 @@ public class ChatUIManager : UdonSharpBehaviour
             chatPanel.SetActive(shouldBeActive);
             if (shouldBeActive)
             {
-                RefreshChatDisplay();
+                RefreshChatDisplay(); // Refresh when panel becomes active
             }
         }
     }
 
     private void HandleInputActivation()
     {
-        if (Input.GetKeyDown(KeyCode.Return) && !isInputFocused)
+        // Check if input field exists and is interactable
+        if (playerInputField == null || !playerInputField.interactable) return;
+
+        // Use GetKeyDown for single activation press
+        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
         {
-            playerInputField.ActivateInputField();
+             if (!isInputFocused)
+             {
+                playerInputField.ActivateInputField(); // Focus the input field
+             }
+             // Note: onEndEdit handles the submission when Enter is pressed while focused
         }
     }
 
+    // Called when Enter is pressed while Input Field is focused, or when deselected
     public void OnInputFieldSubmit(string message)
     {
-        if (!string.IsNullOrWhiteSpace(message) && Input.GetKeyDown(KeyCode.Return))
+        // Only submit if Enter was pressed (check GetKeyDown again)
+        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+        {
+            if (!string.IsNullOrWhiteSpace(message))
+            {
+                SendMessageToAI(message);
+                playerInputField.text = "";
+                // Reactivate the input field to allow continuous typing after sending
+                playerInputField.ActivateInputField();
+            } else {
+                 // If message is empty/whitespace, just keep focus
+                 playerInputField.ActivateInputField();
+            }
+        }
+         // Important: Keep the input field focused even after submitting
+         // If you lose focus here, you might need to press Enter twice.
+         // playerInputField.ActivateInputField(); // Ensure it stays focused for next message
+    }
+
+    // Optional: Separate button click handler if you have a Send button
+    public void OnSendButtonPressed()
+    {
+        if (playerInputField == null) return;
+        string message = playerInputField.text;
+        if (!string.IsNullOrWhiteSpace(message))
         {
             SendMessageToAI(message);
             playerInputField.text = "";
-            playerInputField.ActivateInputField();
+            playerInputField.ActivateInputField(); // Keep focus after sending via button
         }
     }
 
-    public void OnSendButtonPressed()
-    {
-        if (!string.IsNullOrWhiteSpace(playerInputField.text))
-        {
-            SendMessageToAI(playerInputField.text);
-            playerInputField.text = "";
-            playerInputField.ActivateInputField();
-        }
-    }
-
-    private void SendMessageToAI(string message)
+    // FIX: Made public so InteractableItem can call it
+    public void SendMessageToAI(string message)
     {
         if (aiEngine == null)
         {
             LogError("AIEngine is not assigned!");
+            DisplayBotMessage("Error: AI Engine not connected."); // Inform user
             return;
         }
 
-        string response = aiEngine.ProcessInput(message);
+        // Display player message immediately for responsiveness
         DisplayPlayerMessage(message);
+
+        // Get response from AI
+        string response = aiEngine.ProcessInput(message);
         DisplayBotMessage(response);
 
+        // Trigger TTS if available
         if (ttsManager != null)
         {
             ttsManager.Speak(response);
@@ -152,6 +196,7 @@ public class ChatUIManager : UdonSharpBehaviour
         AddChatMessage($"{playerMessagePrefix}{message}");
     }
 
+    // Made public in case other scripts need to display bot messages directly
     public void DisplayBotMessage(string message)
     {
         AddChatMessage($"{botMessagePrefix}{message}{botMessageSuffix}");
@@ -161,7 +206,7 @@ public class ChatUIManager : UdonSharpBehaviour
     {
         if (chatHistory.Count >= maxChatHistory)
         {
-            chatHistory.RemoveAt(0); // Remove oldest
+            chatHistory.RemoveAt(0); // Remove the oldest message
         }
         chatHistory.Add(message);
         RefreshChatDisplay();
@@ -172,23 +217,36 @@ public class ChatUIManager : UdonSharpBehaviour
         if (chatDisplayArea == null) return;
 
         stringBuilder.Clear();
-        foreach (string chat in chatHistory)
+        for (int i = 0; i < chatHistory.Count; i++)
         {
-            stringBuilder.AppendLine(chat);
+            stringBuilder.AppendLine(chatHistory[i]);
         }
         chatDisplayArea.text = stringBuilder.ToString();
 
-        if (chatScrollRect != null)
+        // Scroll to bottom
+        ScrollToBottom();
+    }
+
+    private void ScrollToBottom()
+    {
+         if (chatScrollRect != null)
         {
-            // Delay scroll to end of frame for layout to update
+            // Using Canvas.ForceUpdateCanvases() before scrolling can sometimes help
+            // Canvas.ForceUpdateCanvases();
+            // chatScrollRect.verticalNormalizedPosition = 0f;
+            // Using DelayedFrames is often more reliable for scroll rects
             SendCustomEventDelayedFrames(nameof(UpdateScrollRect), 1);
         }
     }
 
+    // Public method callable by SendCustomEventDelayedFrames
     public void UpdateScrollRect()
     {
-        chatScrollRect.verticalNormalizedPosition = 0f;
+        if (chatScrollRect != null) {
+            chatScrollRect.verticalNormalizedPosition = 0f;
+        }
     }
+
 
     private void LogError(string message)
     {
